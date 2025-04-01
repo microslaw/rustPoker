@@ -1,16 +1,25 @@
-use std::fmt;
+use rand::Rng;
+use std::slice::Iter;
+use std::{fmt, usize};
 
-#[derive(PartialEq, PartialOrd, Eq, Ord)]
+#[derive(PartialEq, PartialOrd, Eq, Ord, Clone)]
 pub enum Color {
     Spades,
     Hearts,
     Club,
     Diamond,
 }
-
+impl Color {
+    pub const LEN: usize = 4;
+    pub fn iterator() -> Iter<'static, Color> {
+        static COLOR: [Color; Color::LEN] =
+            [Color::Spades, Color::Hearts, Color::Club, Color::Diamond];
+        COLOR.iter()
+    }
+}
 
 impl fmt::Display for Color {
-    fn fmt(&self, f:&mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let txt = match self {
             Color::Spades => "♠".to_string(),
             Color::Hearts => "♥".to_string(),
@@ -21,8 +30,7 @@ impl fmt::Display for Color {
     }
 }
 
-
-#[derive(PartialEq, PartialOrd, Eq, Ord)]
+#[derive(PartialEq, PartialOrd, Eq, Ord, Clone)]
 pub enum Rank {
     Two,
     Three,
@@ -40,7 +48,7 @@ pub enum Rank {
 }
 
 impl fmt::Display for Rank {
-    fn fmt(&self, f:&mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let txt = match self {
             Rank::Two => "2".to_string(),
             Rank::Three => "3".to_string(),
@@ -60,6 +68,30 @@ impl fmt::Display for Rank {
     }
 }
 
+impl Rank {
+    pub const LEN: usize = 13;
+
+    pub fn iterator() -> Iter<'static, Rank> {
+        static COLOR: [Rank; Rank::LEN] = [
+            Rank::Two,
+            Rank::Three,
+            Rank::Four,
+            Rank::Five,
+            Rank::Six,
+            Rank::Seven,
+            Rank::Eight,
+            Rank::Nine,
+            Rank::Ten,
+            Rank::Jack,
+            Rank::Queen,
+            Rank::King,
+            Rank::Ace,
+        ];
+        COLOR.iter()
+    }
+}
+
+#[derive(Clone)]
 pub struct Card {
     pub rank: Rank,
     color: Color,
@@ -95,8 +127,62 @@ impl Ord for Card {
 }
 
 impl fmt::Display for Card {
-    fn fmt(&self, f:&mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "[{}{}]", self.rank, self.color)
     }
+}
 
+#[derive(Default)]
+pub struct Hand {
+    cards: Vec<Card>,
+}
+
+impl Hand {
+    pub fn add_card(&mut self, card: Card) {
+        self.cards.push(card);
+    }
+
+    pub fn concat(&self, other: &Hand) -> Hand {
+        let mut new_hand: Hand = Hand::default();
+        new_hand.cards.extend(self.cards.iter().cloned());
+        new_hand.cards.extend(other.cards.iter().cloned());
+        return new_hand;
+    }
+
+    pub fn pop_random(&mut self) -> Card {
+
+        let num = rand::thread_rng().gen_range(0..self.cards.len());
+        let poped: Card = self.cards[num].clone();
+        self.cards.remove(1);
+
+        return poped;
+    }
+}
+
+impl fmt::Display for Hand {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "----");
+        for (i, card) in self.cards.iter().enumerate() {
+            if i % 5 == 0 {
+                write!(f, "\n");
+            }
+            write!(f, "{}", card);
+        }
+        write!(f, "\n----\n")
+    }
+}
+
+pub fn getSortedDeck() -> Hand {
+    let mut deck: Hand = Hand::default();
+
+    for color in Color::iterator() {
+        for rank in Rank::iterator() {
+            deck.add_card(Card {
+                rank: rank.clone(),
+                color: color.clone(),
+            });
+        }
+    }
+
+    return deck;
 }

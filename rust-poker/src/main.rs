@@ -2,13 +2,12 @@ mod datatypes;
 use datatypes::*;
 
 fn main() {
+    let mut deck = getSortedDeck();
 
+    println!("{}", deck);
 
-    if C1 < C2 {
-        println!("c2 bigger");
-    } else {
-        println!("c1 bigger");
+    for _ in 0..10{
+        let card = deck.pop_random();
+        println!("{}", card);
     }
-
-    println!("{}", C1);
 }
