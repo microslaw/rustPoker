@@ -161,7 +161,7 @@ impl Board {
             },
             PlayerAction::Raise(amount) => {
                 if amount < self.min_raise {
-                    println!("Raise must be at least the minimum raise: {}", self.min_raise);
+                    println!("Raise must be at least the minimum raise: {} $", self.min_raise);
                     return false;
                 }
                 
@@ -293,7 +293,7 @@ impl Board {
                 }
             },
             'r' => {
-                println!("Enter raise amount (minimum {}): ", self.min_raise);
+                println!("Enter raise amount (minimum {} $): ", self.min_raise);
                 print!("> ");
                 io::stdout().flush().unwrap();
                 
@@ -439,13 +439,13 @@ impl Board {
         println!("\n=== No Limit Texas Hold'em Poker ===");
         
         let mut round = 1;
-        while self.count_players_with_chips() > 1 {
+        while self.count_players_with_money() > 1 {
             println!("\n=== Round {} ===", round);
             println!("Dealer: {}", self.players[self.dealer_pos].get_name());
             
             self.play_round();
             
-            // Display chip counts
+            // Display each player money
             println!("\nMoney");
             for player in &self.players {
                 println!("{}: {} $", player.get_name(), player.get_money());
@@ -469,28 +469,28 @@ impl Board {
         self.announce_winner();
     }
     
-    fn count_players_with_chips(&self) -> usize {
+    fn count_players_with_money(&self) -> usize {
         self.players.iter().filter(|p| p.get_money() > 0).count()
     }
     
     fn announce_winner(&self) {
         let mut winner_idx = 0;
-        let mut max_chips = 0;
+        let mut max_money = 0;
     
         // Find the player with the most money
         for (idx, player) in self.players.iter().enumerate() {
             let money = player.get_money();
-            if money > max_chips {
-                max_chips = money;
+            if money > max_money {
+                max_money = money;
                 winner_idx = idx;
             }
         }
     
         // Check if we found a winner
-        if max_chips > 0 {
+        if max_money > 0 {
             println!("\n🏆 {} is the winner with {} $! 🏆", 
                 self.players[winner_idx].get_name(), 
-                max_chips);
+                max_money);
         } else {
             println!("\nNo winner found - everyone is out of $!");
         }
