@@ -120,9 +120,13 @@ impl Board {
         
         // Post small blind
         self.players[small_blind_pos].bet(small_blind);
+        self.pot += small_blind;
+        println!("{} posts small blind of {} $", self.players[small_blind_pos].get_name(), small_blind);
         
         // Post big blind
         self.players[big_blind_pos].bet(big_blind);
+        self.pot += big_blind;
+        println!("{} posts big blind of {} $", self.players[big_blind_pos].get_name(), big_blind);
         
         self.current_bet = big_blind;
         self.min_raise = big_blind;
@@ -154,6 +158,7 @@ impl Board {
                         println!("Not enough $ to call");
                         return false;
                     }
+                    self.pot += call_amount;
                     println!("{} calls {}", player.get_name(), call_amount);
                 } else {
                     println!("{} calls", player.get_name());
@@ -173,6 +178,7 @@ impl Board {
                     println!("Not enough $ for this raise");
                     return false;
                 }
+                self.pot += total_needed;
                 
                 self.current_bet = total_bet;
                 self.min_raise = amount; // Set new minimum raise
@@ -181,6 +187,7 @@ impl Board {
             PlayerAction::AllIn => {
                 let all_in_amount = player.get_money();
                 let _ = player.bet(all_in_amount); // This will put player all-in
+                self.pot += all_in_amount;
                 
                 // If the all-in amount is greater than current bet, update current bet
                 let new_bet = player_bet + all_in_amount;
@@ -201,7 +208,7 @@ impl Board {
 
     pub fn betting_round(&mut self) {
         let mut players_acted = 0;
-        let player_count = self.players.len();
+        let player_count = self.players.len() - self.current_player_idx + 1;
         
         // Continue until all players have had a chance to act and all bets are called
         while players_acted < player_count {
@@ -261,7 +268,7 @@ impl Board {
     
     fn collect_bets(&mut self) {
         for player in &mut self.players {
-            self.pot += player.collect_bet();
+            player.collect_bet();
         }
         self.current_bet = 0;
     }
@@ -270,7 +277,9 @@ impl Board {
         let player = &self.players[self.current_player_idx];
         println!("\n{}'s turn", player.get_name());
         println!("Your cards:\n{}", player.get_hand());
-        println!("Community cards:\n{}", self.community_cards);
+        // if self.community_cards.len() > 0 {
+        //     println!("Community cards:\n{}", self.community_cards);
+        // }
         println!("Current bet: {} $, your bet: {} $", self.current_bet, player.get_current_bet());
         println!("Your money: {} $", player.get_money());
         println!("Pot: {} $", self.pot);
@@ -338,12 +347,11 @@ impl Board {
         // Shuffle deck
         self.shuffle_deck();
         
-        // Deal hole cards
-        self.deal_hole_cards();
-        
         // Pre-flop betting round
         self.game_stage = GameStage::PreFlop;
         self.post_blinds();
+        // Deal hole cards
+        self.deal_hole_cards();
         self.betting_round();
         
         // Check if only one player remains
@@ -355,7 +363,7 @@ impl Board {
         // Flop
         self.game_stage = GameStage::Flop;
         self.deal_community_cards(3);
-        println!("\nFLOP: {}", self.community_cards);
+        println!("\nFLOP:\n{}", self.community_cards);
         self.current_player_idx = (self.dealer_pos + 1) % self.players.len();
         self.betting_round();
         
@@ -368,7 +376,7 @@ impl Board {
         // Turn
         self.game_stage = GameStage::Turn;
         self.deal_community_cards(1);
-        println!("\nTURN: {}", self.community_cards);
+        println!("\nTURN:\n{}", self.community_cards);
         self.current_player_idx = (self.dealer_pos + 1) % self.players.len();
         self.betting_round();
         
@@ -381,7 +389,7 @@ impl Board {
         // River
         self.game_stage = GameStage::River;
         self.deal_community_cards(1);
-        println!("\nRIVER: {}", self.community_cards);
+        println!("\nRIVER:\n{}", self.community_cards);
         self.current_player_idx = (self.dealer_pos + 1) % self.players.len();
         self.betting_round();
         
@@ -407,11 +415,11 @@ impl Board {
         // Show all active players' cards
         for (idx, active) in self.active_players.iter().enumerate() {
             if *active {
-                println!("{}'s hand: {}", self.players[idx].get_name(), self.players[idx].get_hand());
+                println!("{}'s hand:\n{}", self.players[idx].get_name(), self.players[idx].get_hand());
             }
         }
         
-        println!("Community cards: {}", self.community_cards);
+        println!("Community cards:\n{}", self.community_cards);
         
         // Determine winners
         let winners = self.determine_winners();
