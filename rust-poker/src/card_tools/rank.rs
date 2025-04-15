@@ -29,7 +29,7 @@ impl fmt::Display for Rank {
             Rank::Seven => "7".to_string(),
             Rank::Eight => "8".to_string(),
             Rank::Nine => "9".to_string(),
-            Rank::Ten => "0".to_string(),
+            Rank::Ten => "10".to_string(),
             Rank::Jack => "J".to_string(),
             Rank::Queen => "Q".to_string(),
             Rank::King => "K".to_string(),
