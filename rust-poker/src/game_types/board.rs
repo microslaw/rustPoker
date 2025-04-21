@@ -359,6 +359,9 @@ impl Board {
         self.active_players = vec![true; self.players.len()];
         self.pot = 0;
         self.current_bet = 0;
+        for player in &mut self.players {
+            player.clear_hand(); 
+        }
         
         // Shuffle deck
         self.shuffle_deck();
