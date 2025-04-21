@@ -325,15 +325,31 @@ impl Board {
     }
     
     pub fn determine_winners(&self) -> Vec<usize> {
-        // TODO evaluate hands here
-        // For now, just return the active player with highest index
+        let mut best_rank = None;
         let mut winners = Vec::new();
-        for i in (0..self.players.len()).rev() {
-            if self.active_players[i] {
-                winners.push(i);
-                break;
+    
+        for (idx, active) in self.active_players.iter().enumerate() {
+            if *active {
+                let player_hand = self.players[idx].get_hand();
+                let hand_rank = player_hand.evaluate_best_hand(&self.community_cards);
+    
+                match &best_rank {
+                    None => {
+                        best_rank = Some(hand_rank);
+                        winners = vec![idx];
+                    }
+                    Some(current_best) => {
+                        if hand_rank > *current_best {
+                            best_rank = Some(hand_rank);
+                            winners = vec![idx];
+                        } else if hand_rank == *current_best {
+                            winners.push(idx);
+                        }
+                    }
+                }
             }
         }
+    
         winners
     }
     
@@ -411,19 +427,27 @@ impl Board {
     
     fn showdown(&mut self) {
         println!("\n=== SHOWDOWN ===");
-        
-        // Show all active players' cards
+    
+        // Show all active players' cards and their hand rankings
         for (idx, active) in self.active_players.iter().enumerate() {
             if *active {
-                println!("{}'s hand:\n{}", self.players[idx].get_name(), self.players[idx].get_hand());
+                let player_hand = self.players[idx].get_hand();
+                let hand_rank = player_hand.evaluate_best_hand(&self.community_cards);
+    
+                println!(
+                    "{}'s hand:\n{}\nHand Rank: {:?}",
+                    self.players[idx].get_name(),
+                    player_hand,
+                    hand_rank
+                );
             }
         }
-        
+    
         println!("Community cards:\n{}", self.community_cards);
-        
+    
         // Determine winners
         let winners = self.determine_winners();
-        
+    
         // Award pot to winners
         let pot_share = self.pot / winners.len() as u16;
         for &winner_idx in &winners {
