@@ -69,32 +69,6 @@ impl Hand {
     pub fn get_cards(&self) -> &Vec<Card> {
         &self.cards
     }
-    
-    // This method will be used for hand evaluation
-    pub fn evaluate(&self) -> u32 {
-        // In a complete implementation, this would determine hand rank
-        // (straight flush, four of a kind, etc.)
-        // For now, let's return a simple score
-        let mut score = 0;
-        for card in &self.cards {
-            score += match card.rank {
-                Rank::Two => 2,
-                Rank::Three => 3,
-                Rank::Four => 4,
-                Rank::Five => 5,
-                Rank::Six => 6,
-                Rank::Seven => 7,
-                Rank::Eight => 8,
-                Rank::Nine => 9,
-                Rank::Ten => 10,
-                Rank::Jack => 11,
-                Rank::Queen => 12,
-                Rank::King => 13,
-                Rank::Ace => 14,
-            };
-        }
-        score
-    }
 
     pub fn evaluate_best_hand(&self, community_cards: &Hand) -> HandRank {
         let mut all_cards = self.cards.clone();
