@@ -1,7 +1,8 @@
 use std::fmt;
 use std::slice::Iter;
+use serde::{Serialize, Deserialize};
 
-#[derive(PartialEq, PartialOrd, Eq, Ord, Clone)]
+#[derive(PartialEq, PartialOrd, Eq, Ord, Clone, Serialize, Deserialize)]
 pub enum Rank {
     Two,
     Three,

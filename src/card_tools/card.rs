@@ -1,8 +1,9 @@
-use crate::card_tools::rank::*;
 use crate::card_tools::color::*;
+use crate::card_tools::rank::*;
+use serde::{Deserialize, Serialize};
 use std::fmt;
 
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct Card {
     pub rank: Rank,
     pub color: Color,
