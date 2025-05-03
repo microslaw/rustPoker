@@ -6,8 +6,9 @@ pub struct Messenger{
     stream: TcpStream,
 }
 
+
 impl Messenger{
-    fn message_client(self, message_type: ServerMessageTypes){
+    fn message_client(self, message_type: ServerMessageTypes, ){
 
     }
 
