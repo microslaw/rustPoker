@@ -14,6 +14,11 @@ pub fn main() {
         handle_connection(stream);
     }
 
+    // client loop
+    while true{
+
+    }
+
 }
 
 fn handle_connection(mut stream: TcpStream) {
