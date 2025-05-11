@@ -7,6 +7,7 @@ use std::time::Duration;
 // Connect to a local server.
 
 fn main() {
+
     trpl::run(async {
         let listener = TcpListener::bind("127.0.0.1:7878").await.unwrap();
         loop {
@@ -35,10 +36,13 @@ async fn handle_connection(listener: &TcpListener) {
     let card: Card = serde_json::from_str(&message).unwrap();
     print!("{}", card);
 
-    stream.write(b"Ok");
+    trpl::sleep(Duration::from_millis(2500)).await;
+    stream.write(b"Ok").await;
+    stream.flush().await.unwrap();
+
 }
 
 async fn display_loading() {
-    print!("...\n");
+    println!(".");
     trpl::sleep(Duration::from_millis(1000)).await;
 }
