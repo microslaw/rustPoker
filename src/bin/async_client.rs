@@ -1,4 +1,4 @@
-use async_std::io::ReadExt;
+use async_std::io::{ReadExt, WriteExt};
 use async_std::net::TcpListener;
 use core::str;
 use rust_poker::card_tools::card::Card;
@@ -19,6 +19,7 @@ async fn handle_connection(listener: &TcpListener) {
     let result = listener.accept();
     let mut stream;
     (stream, _) = result.await.ok().unwrap();
+
     let mut buffer = [0; 1024];
     // stream.read(&mut buffer).unwrap();
     stream.read(&mut buffer).await.unwrap();
@@ -33,6 +34,8 @@ async fn handle_connection(listener: &TcpListener) {
     print!("{}", message.len());
     let card: Card = serde_json::from_str(&message).unwrap();
     print!("{}", card);
+
+    stream.write(b"Ok");
 }
 
 async fn display_loading() {

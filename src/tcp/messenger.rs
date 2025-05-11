@@ -17,6 +17,7 @@ pub struct Messenger {
 
 trait MessagePayload<'de>: Serialize + Deserialize<'de> {}
 
+
 impl Messenger {
     fn new(addr: &String) -> Self {
         trpl::run(async {
@@ -43,7 +44,7 @@ impl Messenger {
     }
 
 
-    async fn <T>receive_from_client(&mut self) -> (T, String) where  {
+    async fn receive_from_client(&mut self) -> (ClientMessageTypes, String) where  {
         let mut stream_type;
         (stream_type, _) = self.listener.accept().await.ok().unwrap();
         // (stream, _) = tcp_result.await.ok().unwrap();
