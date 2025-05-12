@@ -1,87 +1,82 @@
-use super::message_types::MessageTypes;
 use crate::tcp::message_types::{ClientMessageTypes, ServerMessageTypes};
-use async_std::io::{ReadExt, WriteExt};
-use async_std::stream;
 use core::str;
 use serde::{Deserialize, Serialize};
-use std::io::{BufRead, BufReader, Write};
+use std::{sync::Arc, time::Duration};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
+use tokio::sync::Mutex;
 use trpl::Runtime;
+
+use super::client_messenger::ClientMessage;
 
 pub struct ServerMessenger {
     listener: TcpListener,
     addr: String,
-    connections: Vec<TcpStream>,
+    pub streams: Arc<Mutex<Vec<TcpStream>>>,
 }
 
-trait MessagePayload<'de>: Serialize + Deserialize<'de> {}
-
 impl ServerMessenger {
-    pub fn new(addr: &'static str) -> Self {
-        let rt = Runtime::new().unwrap();
-        let new_server = rt.block_on(async {
-            ServerMessenger {
-                listener: TcpListener::bind(addr).await.unwrap(),
-                addr: addr.to_string(),
-                connections: Vec::new(),
-            }
-        });
-
-        return new_server;
-    }
-
-    pub async fn start(&mut self) {
-        println!("Server started on {}", self.addr);
-        loop {
-            let stream: TcpStream;
-            (stream, _) = self.listener.accept().await.unwrap();
-            self.connections.push(stream);
+    pub async fn new(addr: &'static str) -> Self {
+        ServerMessenger {
+            listener: TcpListener::bind(addr).await.unwrap(),
+            addr: addr.to_string(),
+            streams: Arc::new(Mutex::new(Vec::new())),
         }
     }
 
-    async fn send<T, MessageTypes>(
+    pub async fn start(&self) {
+        println!("Server started on {}", self.addr);
+        loop {
+            let (stream, _) = self.listener.accept().await.unwrap();
+            println!("Added connection");
+
+            let streams = self.streams.clone(); // Clone the Arc<Mutex<Vec<TcpStream>>>
+            tokio::spawn(async move {
+                let mut streams = streams.lock().await;
+                streams.push(stream);
+                println!("Finished adding");
+            });
+        }
+    }
+
+    pub async fn send<T>(
         &mut self,
         client_id: usize,
-        message_type: MessageTypes,
+        message_type: ServerMessageTypes,
         message_payload: T,
     ) where
-        T: for<'a> MessagePayload<'a>,
-        MessageTypes: Serialize,
+        T: Serialize,
     {
         let type_json = serde_json::to_string(&message_type).unwrap();
         let payload_json = serde_json::to_string(&message_payload).unwrap();
 
-        let stream = self.connections.get_mut(client_id).unwrap();
+        let mut streams = self.streams.lock().await;
+        let stream = streams.get_mut(client_id).unwrap();
 
-        stream
-            .write_all(type_json.as_bytes())
-            .await
-            .unwrap();
-        stream
-            .write_all(payload_json.as_bytes())
-            .await
-            .unwrap();
+        stream.write_all(type_json.as_bytes()).await.unwrap();
+        stream.write_all(payload_json.as_bytes()).await.unwrap();
     }
 
-    async fn receive(&mut self, client_id: usize) -> (ClientMessageTypes, String) where {
-        let mut buffer = [0; 1024];
-        let stream = self.connections.get_mut(client_id).unwrap();
+    pub async fn receive(&self, client_id: usize) -> ClientMessage where {
+        let mut buffer: Vec<u8> = Vec::new();
+        let mut streams = self.streams.lock().await;
+        let stream = streams.get_mut(client_id).unwrap();
 
-        stream.read(&mut buffer).await.unwrap();
-        let message = str::from_utf8(&buffer)
+        stream.read_to_end(&mut buffer).await.unwrap();
+        let message_json = str::from_utf8(&buffer)
             .unwrap()
+            .trim_matches(char::from(0))
             .trim_matches(char::from(0))
             .trim();
-        let message_type: ClientMessageTypes = serde_json::from_str(&message).unwrap();
 
-        stream.read(&mut buffer).await.unwrap();
-        let message = str::from_utf8(&buffer)
-            .unwrap()
-            .trim_matches(char::from(0))
-            .trim()
-            .to_owned();
 
-        return (message_type, message);
+        println!("{}", message_json);
+        for byte in message_json.as_bytes() {
+            print!("{:02X} ", byte); // Print each byte in hexadecimal format
+        }
+        println!();
+
+        let message: ClientMessage = serde_json::from_str(&message_json).unwrap();
+        return message;
     }
 }
