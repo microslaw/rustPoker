@@ -1,5 +1,6 @@
 mod card_tools;
 mod game_types;
+mod tcp;
 
 use std::io::{self, Write};
 use game_types::board::Board;
@@ -44,6 +45,6 @@ fn main() {
     let money = money.trim().parse::<u16>().unwrap_or(100);
 
     // Create board and start game
-    let mut board = Board::new(player_names, money);
-    board.game_loop();
+    // let mut board = Board::new(player_names, money);
+    // board.game_loop();
 }

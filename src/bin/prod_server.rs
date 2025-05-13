@@ -1,5 +1,5 @@
 use async_std::task::sleep;
-use rust_poker::tcp::message_types::ServerMessageTypes;
+use rust_poker::tcp::message_types::{ClientMessageTypes, ServerMessageTypes};
 use rust_poker::{game_types::board::Board, tcp::server_messenger::ServerMessenger};
 use std::{sync::Arc, time::Duration};
 use tokio::sync::Mutex;
@@ -19,15 +19,24 @@ async fn main() {
         tokio::time::sleep(Duration::from_secs(1)).await;
         println!("Table closed");
 
+        let mut player_names = Vec::new();
         let stream_count = { messenger_arc.stream_count().await };
         for i in 0..stream_count {
             messenger_arc
                 .send(i, ServerMessageTypes::JoinGame, "")
                 .await;
             let message = messenger_arc.receive(i).await;
+            assert_eq!(
+                message.message_type,
+                ClientMessageTypes::JoinGameAcknowledgement
+            );
+            let nickname: String = serde_json::from_str(&message.payload_json).unwrap();
+            player_names.push(nickname);
         }
 
-        // let mut board = Board::new(player_names, money);
+        let mut board = Board::new(player_names, 100, Arc::clone(&messenger_arc));
+
+        board.game_loop();
 
         // get number of streams
 

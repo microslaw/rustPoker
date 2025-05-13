@@ -3,7 +3,7 @@ use std::fmt::{self, Display};
 
 pub trait MessageTypes<'de>: Serialize + Deserialize<'de> + Display {}
 
-#[derive(PartialEq, Eq, Serialize, Deserialize)]
+#[derive(PartialEq, Eq, Serialize, Deserialize, Debug)]
 pub enum ClientMessageTypes {
     Handshake1,
     Handshake3,
