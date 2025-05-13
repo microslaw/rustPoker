@@ -1,41 +1,35 @@
 use async_std::task::sleep;
-use rust_poker::tcp::server_messenger::ServerMessenger;
+use rust_poker::tcp::message_types::ServerMessageTypes;
+use rust_poker::{game_types::board::Board, tcp::server_messenger::ServerMessenger};
 use std::{sync::Arc, time::Duration};
 use tokio::sync::Mutex;
 use trpl::Runtime;
 
 #[tokio::main]
 async fn main() {
-    let messenger = Arc::new(ServerMessenger::new("127.0.0.1:7878").await);
-    let messenger_clone = Arc::clone(&messenger);
+    let messenger_arc = Arc::new(ServerMessenger::new("127.0.0.1:7878").await);
+    let messenger_clone = Arc::clone(&messenger_arc);
     tokio::spawn(async move {
         messenger_clone.start().await;
     });
 
     loop {
-        tokio::time::sleep(Duration::from_secs(5)).await;
-        println!("Start tick");
+        // 5 sec to join the game
+        println!("Players ready");
+        tokio::time::sleep(Duration::from_secs(1)).await;
+        println!("Table closed");
 
-        let stream_count: usize;
-        {
-            stream_count = messenger.streams.lock().await.len();
+        let stream_count = { messenger_arc.stream_count().await };
+        for i in 0..stream_count {
+            messenger_arc
+                .send(i, ServerMessageTypes::JoinGame, "")
+                .await;
+            let message = messenger_arc.receive(i).await;
         }
 
-        // {
-        //     if let Ok(mut streams) = messenger.streams.try_lock() {
-        //         println!("Mutex is not locked. Acquired lock successfully.");
-        //         // Perform operations on the streams
-        //     } else {
-        //         println!("Mutex is locked. Could not acquire lock.");
-        //     }
-        // }
+        // let mut board = Board::new(player_names, money);
 
         // get number of streams
-
-        for i in 0..stream_count {
-            let message = messenger.receive(i).await;
-            println!("{}, {}", message.message_type, message.payload_json);
-        }
 
         println!("Tick")
     }

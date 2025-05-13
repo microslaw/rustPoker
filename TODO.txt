@@ -2,11 +2,7 @@ multi player
 cbor - we may use
 
 TCP protocol:
-- handshakes
-    - handshake_1, client -> server: <handshake_1>
-    - handshake_2, server -> client: <handshake_2>
-    - handshake_3, client -> server: <handshake_3>
-    - if any fails, close connection
+
 
 - joining game
     - if game has started:
@@ -30,9 +26,8 @@ TCP protocol:
 
 
 
-<c_handshake_1> -> <s_handshake_2>
-<s_handshake_2> -> <c_handshake_3>
-<c_handshake_3> -> <s_spectator_next_turn> or <s_join_game>
+
+<s_spectator_next_turn> or <s_join_game>
 
     <s_spectator_next_turn> -> <c_spectator_next_turn_acknowledgment>
     <c_spectator_next_turn_acknowledgment> -> <s_spectator_next_turn> or <s_game_result>
@@ -49,9 +44,6 @@ TCP protocol:
 
 
 
-<c_handshake_1>: none
-<s_handshake_2>: none
-<c_handshake_3>: none
 <s_spectator_next_turn>: BoardState
 <s_join_game>: none
 <c_join_game_acknowledgment> : Player Name

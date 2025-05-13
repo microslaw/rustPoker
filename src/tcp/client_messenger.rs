@@ -1,10 +1,14 @@
 use crate::tcp::message_types::{ClientMessageTypes, ServerMessageTypes};
 use async_std::io::{ReadExt, WriteExt};
+use async_std::stream;
 use core::str;
 use serde::{Deserialize, Serialize};
+use std::time::Duration;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use trpl::Runtime;
+
+use super::server_messenger::ServerMessage;
 
 pub struct ClientMessenger {
     stream: TcpStream,
@@ -38,26 +42,32 @@ impl ClientMessenger {
 
         let message_json = serde_json::to_string(&message).unwrap();
 
-        self.stream.write_all(message_json.as_bytes()).await.unwrap();
+        println!("sending {}", message_json);
+        self.stream
+            .write_all(message_json.as_bytes())
+            .await
+            .unwrap();
     }
 
-    pub async fn receive(&mut self) -> (ClientMessageTypes, String) where {
-        let mut buffer = [0; 1024];
+    pub async fn receive(&mut self) -> ServerMessage {
 
-        self.stream.read(&mut buffer).await.unwrap();
-        let message = str::from_utf8(&buffer)
+        let mut buffer:[u8; 1024] = [0; 1024];
+
+        while buffer[0] == 0 {
+            self.stream.read(&mut buffer).await.unwrap();
+            tokio::time::sleep(Duration::from_millis(100)).await;
+        }
+
+        let message_json = str::from_utf8(&buffer)
             .unwrap()
             .trim_matches(char::from(0))
             .trim();
-        let message_type: ClientMessageTypes = serde_json::from_str(&message).unwrap();
 
-        self.stream.read(&mut buffer).await.unwrap();
-        let message = str::from_utf8(&buffer)
-            .unwrap()
-            .trim_matches(char::from(0))
-            .trim()
-            .to_owned();
+        println!("received {}", message_json);
 
-        return (message_type, message);
+        let message: ServerMessage = serde_json::from_str(&message_json).unwrap();
+
+
+        return message;
     }
 }

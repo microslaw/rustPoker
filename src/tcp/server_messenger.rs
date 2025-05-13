@@ -5,6 +5,7 @@ use std::{sync::Arc, time::Duration};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::Mutex;
+use tokio::time::{Sleep, timeout};
 use trpl::Runtime;
 
 use super::client_messenger::ClientMessage;
@@ -13,6 +14,12 @@ pub struct ServerMessenger {
     listener: TcpListener,
     addr: String,
     pub streams: Arc<Mutex<Vec<TcpStream>>>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct ServerMessage {
+    pub message_type: ServerMessageTypes,
+    pub payload_json: String,
 }
 
 impl ServerMessenger {
@@ -30,7 +37,8 @@ impl ServerMessenger {
             let (stream, _) = self.listener.accept().await.unwrap();
             println!("Added connection");
 
-            let streams = self.streams.clone(); // Clone the Arc<Mutex<Vec<TcpStream>>>
+            let streams = self.streams.clone();
+
             tokio::spawn(async move {
                 let mut streams = streams.lock().await;
                 streams.push(stream);
@@ -39,42 +47,54 @@ impl ServerMessenger {
         }
     }
 
+    pub async fn stream_count(&self) -> usize {
+        self.streams.lock().await.len()
+    }
+
     pub async fn send<T>(
-        &mut self,
+        &self,
         client_id: usize,
         message_type: ServerMessageTypes,
         message_payload: T,
     ) where
         T: Serialize,
     {
-        let type_json = serde_json::to_string(&message_type).unwrap();
         let payload_json = serde_json::to_string(&message_payload).unwrap();
 
+        let message = ServerMessage {
+            message_type,
+            payload_json,
+        };
+        let message_json = serde_json::to_string(&message).unwrap();
+
+        println!("sending {}", message_json);
         let mut streams = self.streams.lock().await;
         let stream = streams.get_mut(client_id).unwrap();
-
-        stream.write_all(type_json.as_bytes()).await.unwrap();
-        stream.write_all(payload_json.as_bytes()).await.unwrap();
+        stream.write_all(message_json.as_bytes()).await.unwrap();
     }
 
     pub async fn receive(&self, client_id: usize) -> ClientMessage where {
-        let mut buffer: Vec<u8> = Vec::new();
+        let mut buffer: [u8; 1024] = [0; 1024];
+        // let count = { self.stream_count().await };
+        // println!("id {}, size {}", client_id, count);
         let mut streams = self.streams.lock().await;
+
         let stream = streams.get_mut(client_id).unwrap();
 
-        stream.read_to_end(&mut buffer).await.unwrap();
+        while buffer[0] == 0 {
+            stream.read(&mut buffer).await.unwrap();
+            tokio::time::sleep(Duration::from_millis(100)).await;
+        }
+
         let message_json = str::from_utf8(&buffer)
             .unwrap()
             .trim_matches(char::from(0))
-            .trim_matches(char::from(0))
             .trim();
 
-
-        println!("{}", message_json);
-        for byte in message_json.as_bytes() {
-            print!("{:02X} ", byte); // Print each byte in hexadecimal format
-        }
-        println!();
+        println!("received {}", message_json);
+        // for byte in message_json.as_bytes() {
+        //     print!("{:02X} ", byte); // Print each byte in hexadecimal format
+        // }
 
         let message: ClientMessage = serde_json::from_str(&message_json).unwrap();
         return message;
