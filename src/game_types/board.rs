@@ -2,7 +2,9 @@ use crate::card_tools::card::Card;
 use crate::card_tools::hand::Hand;
 use crate::card_tools::hand::get_sorted_deck;
 use crate::game_types::player::Player;
+use crate::tcp::message_types;
 use crate::tcp::message_types::{ClientMessageTypes, ServerMessageTypes};
+use crate::tcp::server_messenger::ServerMessage;
 use crate::tcp::server_messenger::ServerMessenger;
 use rand::Rng;
 use serde::Deserialize;
@@ -38,6 +40,15 @@ pub struct BoardDto {
     pub your_turn: bool,
     pub current_player_name: String,
     pub min_raise: u16,
+    pub blinds: BlindsDto,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct BlindsDto {
+    pub small_blind: u16,
+    pub small_blind_owner: String,
+    pub big_blind: u16,
+    pub big_blind_owner: String,
 }
 
 pub struct Board {
@@ -132,7 +143,7 @@ impl Board {
         next
     }
 
-    pub fn post_blinds(&mut self) {
+    pub fn post_blinds(&mut self) -> BlindsDto {
         let small_blind_pos = (self.dealer_pos + 1) % self.players.len();
         let big_blind_pos = (self.dealer_pos + 2) % self.players.len();
 
@@ -142,26 +153,23 @@ impl Board {
         // Post small blind
         self.players[small_blind_pos].bet(small_blind);
         self.pot += small_blind;
-        println!(
-            "{} posts small blind of {} $",
-            self.players[small_blind_pos].get_name(),
-            small_blind
-        );
 
         // Post big blind
         self.players[big_blind_pos].bet(big_blind);
         self.pot += big_blind;
-        println!(
-            "{} posts big blind of {} $",
-            self.players[big_blind_pos].get_name(),
-            big_blind
-        );
 
         self.current_bet = big_blind;
         self.min_raise = big_blind;
 
         // Start from player after big blind
         self.current_player_idx = (big_blind_pos + 1) % self.players.len();
+
+        BlindsDto {
+            small_blind: 1,
+            small_blind_owner: self.players[small_blind_pos].get_name().to_string(),
+            big_blind: 2,
+            big_blind_owner: self.players[big_blind_pos].get_name().to_string(),
+        }
     }
 
     pub fn process_action(&mut self, action: PlayerAction) -> bool {
@@ -238,7 +246,20 @@ impl Board {
         true
     }
 
-    pub async fn betting_round(&mut self) {
+    async fn notify_everyone(&self, blind_dto: &BlindsDto) {
+        for (i, _) in self.players.iter().enumerate() {
+            if i == self.current_player_idx {
+                continue; // Skip the current player
+            }
+
+            let board_dto = self.get_board_dto(blind_dto, i);
+            self.messenger_arc
+                .send(i, ServerMessageTypes::NextTurn, board_dto)
+                .await;
+        }
+    }
+
+    pub async fn betting_round(&mut self, blind_dto: &BlindsDto) {
         let mut players_acted = 0;
         let player_count = self.players.len() - self.current_player_idx + 1;
 
@@ -262,7 +283,10 @@ impl Board {
             }
 
             // Get player action through terminal input
-            let action = self.get_player_action().await;
+            let board_dto = self.get_board_dto(blind_dto, current_idx);
+            self.notify_everyone(&blind_dto).await;
+            let action = self.get_player_action(board_dto).await;
+
 
             // Process the action
             if self.process_action(action) {
@@ -305,20 +329,27 @@ impl Board {
         self.current_bet = 0;
     }
 
-    async fn get_player_action(&self) -> PlayerAction {
-        let player = &self.players[self.current_player_idx];
-
-        let message = BoardDto {
+    fn get_board_dto(&self, blind_dto: &BlindsDto, player_id: usize) -> BoardDto {
+        let player = &self.players[player_id];
+        BoardDto {
             current_bet: self.current_bet,
             your_bet: player.get_current_bet(),
             your_money: player.get_money(),
             pot: self.pot,
             your_cards: player.get_hand().clone(),
             community_cards: self.community_cards.clone(),
-            your_turn: true,
+            your_turn: self.current_player_idx == player_id,
             current_player_name: player.get_name().to_string(),
             min_raise: self.min_raise,
-        };
+            blinds: blind_dto.clone(),
+        }
+    }
+
+    async fn get_player_action(&self, board_dto: BoardDto) -> PlayerAction {
+        let player = &self.players[self.current_player_idx];
+
+        let message = board_dto;
+
         self.messenger_arc
             .send(
                 self.current_player_idx,
@@ -378,10 +409,10 @@ impl Board {
 
         // Pre-flop betting round
         self.game_stage = GameStage::PreFlop;
-        self.post_blinds();
+        let blind_dto = self.post_blinds();
         // Deal hole cards
         self.deal_hole_cards();
-        self.betting_round().await;
+        self.betting_round(&blind_dto).await;
 
         // Check if only one player remains
         if self.count_active_players() <= 1 {
@@ -394,7 +425,7 @@ impl Board {
         self.deal_community_cards(3);
         println!("\nFLOP:\n{}", self.community_cards);
         self.current_player_idx = (self.dealer_pos + 1) % self.players.len();
-        self.betting_round().await;
+        self.betting_round(&blind_dto).await;
 
         // Check if only one player remains
         if self.count_active_players() <= 1 {
@@ -407,7 +438,7 @@ impl Board {
         self.deal_community_cards(1);
         println!("\nTURN:\n{}", self.community_cards);
         self.current_player_idx = (self.dealer_pos + 1) % self.players.len();
-        self.betting_round();
+        self.betting_round(&blind_dto).await;
 
         // Check if only one player remains
         if self.count_active_players() <= 1 {
@@ -420,7 +451,7 @@ impl Board {
         self.deal_community_cards(1);
         println!("\nRIVER:\n{}", self.community_cards);
         self.current_player_idx = (self.dealer_pos + 1) % self.players.len();
-        self.betting_round();
+        self.betting_round(&blind_dto).await;
 
         // Showdown
         self.game_stage = GameStage::Showdown;

@@ -31,6 +31,25 @@ async fn main() {
         assert_eq!(message.message_type, ServerMessageTypes::NextTurn);
         let board_dto: BoardDto = serde_json::from_str(&message.payload_json).unwrap();
 
+        println!(
+            "{} posted small blind of {} $",
+            board_dto.blinds.small_blind_owner, board_dto.blinds.small_blind,
+        );
+
+        println!(
+            "{} posted big blind of {} $",
+            board_dto.blinds.big_blind_owner, board_dto.blinds.big_blind,
+        );
+
+        if board_dto.community_cards.len() > 0 {
+            println!("Community cards:\n{}", board_dto.community_cards);
+        }
+
+        println!(
+            "Current bet: {} $, your bet: {} $",
+            board_dto.current_bet, board_dto.your_bet,
+        );
+
         if board_dto.your_turn {
             println!("Your turn");
             println!("Your cards:\n{}", board_dto.your_cards);
@@ -86,18 +105,12 @@ async fn main() {
 
             messenger.send(ClientMessageTypes::PlayCard, action).await;
         } else {
-            println!("Waiting for your turn");
             println!("Your cards:\n{}", board_dto.your_cards);
-            // if self.community_cards.len() > 0 {
-            //     println!("Community cards:\n{}", self.community_cards);
-            // }
-            println!(
-                "Current bet: {} $, your bet: {} $",
-                board_dto.current_bet, board_dto.your_bet,
-            );
 
             println!("Your money: {} $", board_dto.your_money);
             println!("Pot: {} $", board_dto.pot);
+
+            println!("Waiting for {} to play", board_dto.current_player_name);
         }
     }
 }
