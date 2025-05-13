@@ -1,48 +1,32 @@
-use rust_poker::card_tools::card::Card;
-use std::{
-    io::{BufReader, prelude::*},
-    net::{TcpListener, TcpStream},
-    time::Duration,
-};
-use trpl::Either;
+use rust_poker::tcp::client_messenger::ClientMessenger;
+use rust_poker::tcp::message_types::{ClientMessageTypes, ServerMessageTypes};
+use std::time::Duration;
 
-pub fn main() {
-    let listener = TcpListener::bind("127.0.0.1:7878").unwrap();
+#[tokio::main]
+async fn main() {
+    println!("\nWelcome to No Limit Texas Hold'em Poker!");
 
-    for stream in listener.incoming() {
-        let stream = stream.unwrap();
+    let mut nickname: String = String::new();
 
-        trpl::run(async {
-            match trpl::race(handle_connection(stream), display_loading()).await {
-                Either::Left(left) => left,
-                Either::Right(right) => right,
-            };
-
-            print!("Here");
-        })
+    while nickname.is_empty() {
+        println!("Enter your nickname:");
+        print!(">");
+        // io::stdout().flush().unwrap();
+        // nickname = String::new();
+        // io::stdin().read_line(&mut nickname).unwrap();
+        // nickname = nickname.trim().to_string();
+        nickname = "microslaw".to_string();
     }
 
-    print!("Here2");
-}
+    let mut messenger = ClientMessenger::new("127.0.0.1:7878").await;
+    let message = messenger.receive().await;
+    assert_eq!(message.message_type, ServerMessageTypes::JoinGame);
+    messenger
+        .send(ClientMessageTypes::JoinGameAcknowledgement, nickname)
+        .await;
 
-async fn handle_connection(mut stream: TcpStream) {
-    let buf_reader = BufReader::new(&stream);
-    let json: Vec<_> = buf_reader
-        .lines()
-        .map(|result| result.unwrap())
-        .take_while(|line| !line.is_empty())
-        .collect();
-
-    let response = "HTTP/1.1 200 OK\r\n\r\n";
-
-    stream.write_all(response.as_bytes()).unwrap();
-
-    let c: Card = serde_json::from_str(&json.join("")).unwrap();
-
-    println!("Request: {c}");
-}
-
-async fn display_loading() {
-    print!("...");
-    trpl::sleep(Duration::from_millis(1000)).await;
+    tokio::time::sleep(Duration::from_secs(10)).await;
+    messenger
+        .send(ClientMessageTypes::JoinGameAcknowledgement, "a")
+        .await;
 }
