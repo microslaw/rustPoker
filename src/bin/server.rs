@@ -1,6 +1,7 @@
 use rust_poker::tcp::message_types::{ClientMessageTypes, ServerMessageTypes};
 use rust_poker::{game_types::board::Board, tcp::server_messenger::ServerMessenger};
 use std::{sync::Arc, time::Duration};
+use tokio::io::{self, AsyncBufReadExt};
 
 #[tokio::main]
 async fn main() {
@@ -11,10 +12,13 @@ async fn main() {
     });
 
     loop {
-        // 5 sec to join the game
-        println!("Players ready");
-        tokio::time::sleep(Duration::from_secs(1)).await;
-        println!("Table closed");
+        println!("Waiting for players");
+
+        let mut input = String::new();
+        let mut stdin = io::BufReader::new(io::stdin());
+        stdin.read_line(&mut input).await.unwrap();
+
+        println!("Joining closed");
 
         let mut player_names = Vec::new();
         let stream_count = { messenger_arc.stream_count().await };
@@ -33,10 +37,6 @@ async fn main() {
 
         let mut board = Board::new(player_names, 100, Arc::clone(&messenger_arc));
 
-        board.game_loop();
-
-        // get number of streams
-
-        println!("Tick")
+        board.game_loop().await;
     }
 }

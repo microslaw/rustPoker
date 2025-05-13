@@ -2,11 +2,15 @@ use crate::card_tools::card::Card;
 use crate::card_tools::hand::Hand;
 use crate::card_tools::hand::get_sorted_deck;
 use crate::game_types::player::Player;
+use crate::tcp::message_types::{ClientMessageTypes, ServerMessageTypes};
 use crate::tcp::server_messenger::ServerMessenger;
 use rand::Rng;
+use serde::Deserialize;
+use serde::Serialize;
 use std::io::{self, Write};
 use std::sync::Arc;
 
+#[derive(Serialize, Deserialize)]
 pub enum PlayerAction {
     Fold,
     Check,
@@ -21,6 +25,19 @@ pub enum GameStage {
     Turn,
     River,
     Showdown,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct BoardDto {
+    pub current_bet: u16,
+    pub your_bet: u16,
+    pub your_money: u16,
+    pub pot: u16,
+    pub your_cards: Hand,
+    pub community_cards: Hand,
+    pub your_turn: bool,
+    pub current_player_name: String,
+    pub min_raise: u16,
 }
 
 pub struct Board {
@@ -221,7 +238,7 @@ impl Board {
         true
     }
 
-    pub fn betting_round(&mut self) {
+    pub async fn betting_round(&mut self) {
         let mut players_acted = 0;
         let player_count = self.players.len() - self.current_player_idx + 1;
 
@@ -245,7 +262,7 @@ impl Board {
             }
 
             // Get player action through terminal input
-            let action = self.get_player_action();
+            let action = self.get_player_action().await;
 
             // Process the action
             if self.process_action(action) {
@@ -288,59 +305,33 @@ impl Board {
         self.current_bet = 0;
     }
 
-    fn get_player_action(&self) -> PlayerAction {
+    async fn get_player_action(&self) -> PlayerAction {
         let player = &self.players[self.current_player_idx];
-        println!("\n{}'s turn", player.get_name());
-        println!("Your cards:\n{}", player.get_hand());
-        // if self.community_cards.len() > 0 {
-        //     println!("Community cards:\n{}", self.community_cards);
-        // }
-        println!(
-            "Current bet: {} $, your bet: {} $",
-            self.current_bet,
-            player.get_current_bet()
-        );
-        println!("Your money: {} $", player.get_money());
-        println!("Pot: {} $", self.pot);
 
-        println!("Actions: (f)old, (c)heck/call, (r)aise, (a)ll-in");
-        print!("> ");
-        io::stdout().flush().unwrap();
+        let message = BoardDto {
+            current_bet: self.current_bet,
+            your_bet: player.get_current_bet(),
+            your_money: player.get_money(),
+            pot: self.pot,
+            your_cards: player.get_hand().clone(),
+            community_cards: self.community_cards.clone(),
+            your_turn: true,
+            current_player_name: player.get_name().to_string(),
+            min_raise: self.min_raise,
+        };
+        self.messenger_arc
+            .send(
+                self.current_player_idx,
+                ServerMessageTypes::NextTurn,
+                message,
+            )
+            .await;
 
-        let mut input = String::new();
-        io::stdin().read_line(&mut input).unwrap();
-        let input = input.trim().to_lowercase();
+        let response = self.messenger_arc.receive(self.current_player_idx).await;
+        assert_eq!(response.message_type, ClientMessageTypes::PlayCard);
 
-        match input.chars().next().unwrap_or(' ') {
-            'f' => PlayerAction::Fold,
-            'c' => {
-                if player.get_current_bet() < self.current_bet {
-                    PlayerAction::Call
-                } else {
-                    PlayerAction::Check
-                }
-            }
-            'r' => {
-                println!("Enter raise amount (minimum {} $): ", self.min_raise);
-                print!("> ");
-                io::stdout().flush().unwrap();
-
-                let mut amount = String::new();
-                io::stdin().read_line(&mut amount).unwrap();
-                let amount = amount.trim().parse::<u16>().unwrap_or(0);
-
-                PlayerAction::Raise(amount)
-            }
-            'a' => PlayerAction::AllIn,
-            _ => {
-                println!("Invalid action, defaulting to check/call");
-                if player.get_current_bet() < self.current_bet {
-                    PlayerAction::Call
-                } else {
-                    PlayerAction::Check
-                }
-            }
-        }
+        let action: PlayerAction = serde_json::from_str(&response.payload_json).unwrap();
+        action
     }
 
     pub fn determine_winners(&self) -> Vec<usize> {
@@ -372,7 +363,7 @@ impl Board {
         winners
     }
 
-    pub fn play_round(&mut self) {
+    pub async fn play_round(&mut self) {
         // Reset for new round
         self.community_cards = Hand::default();
         self.active_players = vec![true; self.players.len()];
@@ -390,7 +381,7 @@ impl Board {
         self.post_blinds();
         // Deal hole cards
         self.deal_hole_cards();
-        self.betting_round();
+        self.betting_round().await;
 
         // Check if only one player remains
         if self.count_active_players() <= 1 {
@@ -403,7 +394,7 @@ impl Board {
         self.deal_community_cards(3);
         println!("\nFLOP:\n{}", self.community_cards);
         self.current_player_idx = (self.dealer_pos + 1) % self.players.len();
-        self.betting_round();
+        self.betting_round().await;
 
         // Check if only one player remains
         if self.count_active_players() <= 1 {
@@ -493,7 +484,7 @@ impl Board {
         }
     }
 
-    pub fn game_loop(&mut self) {
+    pub async fn game_loop(&mut self) {
         println!("\n=== No Limit Texas Hold'em Poker ===");
 
         let mut round = 1;
@@ -501,7 +492,7 @@ impl Board {
             println!("\n=== Round {} ===", round);
             println!("Dealer: {}", self.players[self.dealer_pos].get_name());
 
-            self.play_round();
+            self.play_round().await;
 
             // Display each player money
             println!("\nMoney");

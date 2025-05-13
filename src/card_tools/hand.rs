@@ -1,4 +1,6 @@
 use rand::Rng;
+use serde::Deserialize;
+use serde::Serialize;
 use std::fmt;
 
 use crate::card_tools::card::*;
@@ -18,7 +20,7 @@ pub enum HandRank {
     StraightFlush(u32),
 }
 
-#[derive(Default)]
+#[derive(Default, Clone, Serialize, Deserialize)]
 pub struct Hand {
     cards: Vec<Card>,
 }
@@ -57,15 +59,15 @@ impl Hand {
             self.cards.swap(i, j);
         }
     }
-    
+
     pub fn len(&self) -> usize {
         self.cards.len()
     }
-    
+
     pub fn is_empty(&self) -> bool {
         self.cards.is_empty()
     }
-    
+
     pub fn get_cards(&self) -> &Vec<Card> {
         &self.cards
     }
