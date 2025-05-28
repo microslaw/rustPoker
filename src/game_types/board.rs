@@ -29,7 +29,7 @@ pub enum GameStage {
     Showdown,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct BoardDto {
     pub current_bet: u16,
     pub your_bet: u16,
