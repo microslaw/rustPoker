@@ -6,7 +6,6 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::Mutex;
 use tokio::time::{Sleep, timeout};
-use trpl::Runtime;
 
 use super::client_messenger::ClientMessage;
 
@@ -75,8 +74,6 @@ impl ServerMessenger {
 
     pub async fn receive(&self, client_id: usize) -> ClientMessage where {
         let mut buffer: [u8; 1024] = [0; 1024];
-        // let count = { self.stream_count().await };
-        // println!("id {}, size {}", client_id, count);
         let mut streams = self.streams.lock().await;
 
         let stream = streams.get_mut(client_id).unwrap();
@@ -92,9 +89,6 @@ impl ServerMessenger {
             .trim();
 
         println!("received {}", message_json);
-        // for byte in message_json.as_bytes() {
-        //     print!("{:02X} ", byte); // Print each byte in hexadecimal format
-        // }
 
         let message: ClientMessage = serde_json::from_str(&message_json).unwrap();
         return message;

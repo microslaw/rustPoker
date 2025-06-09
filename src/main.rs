@@ -44,7 +44,4 @@ fn main() {
     io::stdin().read_line(&mut money).unwrap();
     let money = money.trim().parse::<u16>().unwrap_or(100);
 
-    // Create board and start game
-    // let mut board = Board::new(player_names, money);
-    // board.game_loop();
 }
