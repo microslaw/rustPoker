@@ -41,6 +41,9 @@ pub struct BoardDto {
     pub current_player_name: String,
     pub min_raise: u16,
     pub blinds: BlindsDto,
+    pub round_winners: Vec<Player>,
+    pub game_winner: Player,
+    pub game_over: bool,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -63,6 +66,9 @@ pub struct Board {
     pub active_players: Vec<bool>,
     pub min_raise: u16,
     pub messenger_arc: Arc<ServerMessenger>,
+    pub round_winners: Vec<Player>,
+    pub game_winner: Player,
+    pub game_over: bool,
 }
 
 impl Board {
@@ -79,6 +85,9 @@ impl Board {
             active_players: Vec::new(),
             min_raise: 2, // Minimum raise is typically the big blind
             messenger_arc: messenger_arc,
+            round_winners: Vec::new(),
+            game_winner: Player::new("No Winner".to_string(), 0),
+            game_over: false,
         };
 
         // Initialize players
@@ -342,6 +351,9 @@ impl Board {
             current_player_name: player.get_name().to_string(),
             min_raise: self.min_raise,
             blinds: blind_dto.clone(),
+            round_winners: self.round_winners.clone(),
+            game_winner: self.game_winner.clone(),
+            game_over: self.game_over,
         }
     }
 
@@ -400,9 +412,14 @@ impl Board {
         self.active_players = vec![true; self.players.len()];
         self.pot = 0;
         self.current_bet = 0;
+        self.round_winners.clear();
         for player in &mut self.players {
             player.clear_hand();
+            player.reset_bet();
         }
+        self.round_winners.clear();
+        self.game_winner = Player::new("No Winner".to_string(), 0);
+        self.game_over = false;
 
         // Shuffle deck
         self.shuffle_deck();
@@ -456,9 +473,10 @@ impl Board {
         // Showdown
         self.game_stage = GameStage::Showdown;
         if self.count_active_players() > 1 {
-            self.showdown();
+            self.showdown(&blind_dto).await;
         } else {
             self.award_pot();
+            self.notify_everyone(&blind_dto).await;
         }
 
         // Move dealer button for next round
@@ -469,7 +487,7 @@ impl Board {
         self.active_players.iter().filter(|&&active| active).count()
     }
 
-    fn showdown(&mut self) {
+    async fn showdown(&mut self, blind_dto: &BlindsDto) {
         println!("\n=== SHOWDOWN ===");
 
         // Show all active players' cards and their hand rankings
@@ -496,12 +514,14 @@ impl Board {
         let pot_share = self.pot / winners.len() as u16;
         for &winner_idx in &winners {
             self.players[winner_idx].add_money(pot_share);
+            self.round_winners.push(self.players[winner_idx].clone());
             println!(
                 "{} wins {} $",
                 self.players[winner_idx].get_name(),
                 pot_share
             );
         }
+        self.notify_everyone(blind_dto).await;
     }
 
     fn award_pot(&mut self) {
@@ -553,7 +573,7 @@ impl Board {
         self.players.iter().filter(|p| p.get_money() > 0).count()
     }
 
-    fn announce_winner(&self) {
+    fn announce_winner(&mut self) {
         let mut winner_idx = 0;
         let mut max_money = 0;
 
@@ -568,6 +588,7 @@ impl Board {
 
         // Check if we found a winner
         if max_money > 0 {
+            self.game_winner = self.players[winner_idx].clone();
             println!(
                 "\n🏆 {} is the winner with {} $! 🏆",
                 self.players[winner_idx].get_name(),
@@ -577,6 +598,7 @@ impl Board {
             println!("\nNo winner found - everyone is out of $!");
         }
 
+        self.game_over = true;
         println!("Game Over. Thanks for playing!");
     }
 }

@@ -91,51 +91,66 @@ impl App for PokerClientApp {
                 ui.label(format!("Small blind: {} posted {} $", board.blinds.small_blind_owner, board.blinds.small_blind));
                 ui.label(format!("Big blind: {} posted {} $", board.blinds.big_blind_owner, board.blinds.big_blind));
 
-                if board.your_turn {
+                // determine game winner
+                if board.game_winner.get_name() != "No Winner" {
                     ui.separator();
-                    ui.label("Your turn: Choose action");
-
-                    let mut input_raise = std::mem::take(&mut self.input_raise);
-                    let mut status = std::mem::take(&mut self.status);
-
-                    ui.horizontal(|ui| {
-                        if ui.button("Fold").clicked() {
-                            self.send_action(PlayerAction::Fold);
-                        }
-                        if ui.button("Check/Call").clicked() {
-                            let action = if board.your_bet < board.current_bet {
-                                PlayerAction::Call
-                            } else {
-                                PlayerAction::Check
-                            };
-                            self.send_action(action);
-                        }
-                        ui.label("Raise:");
-                        ui.text_edit_singleline(&mut input_raise);
-                        if ui.button("Raise").clicked() {
-                            if let Ok(amount) = input_raise.trim().parse::<u16>() {
-                                if amount >= board.min_raise {
-                                    self.send_action(PlayerAction::Raise(amount));
-                                    input_raise.clear();
-                                } else {
-                                    status = format!("Raise must be at least {}", board.min_raise);
-                                }
-                            } else {
-                                status = "Invalid raise amount".to_string();
-                            }
-                        }
-                        if ui.button("All-in").clicked() {
-                            self.send_action(PlayerAction::AllIn);
-                        }
-                    });
-
-                    self.input_raise = input_raise;
-                    self.status = status;
-                } else {
-                    ui.separator();
-                    ui.label(format!("Waiting for {} to play...", board.current_player_name));
+                    ui.label(format!("Game winner: {} with hand {}", board.game_winner.get_name(), board.game_winner.get_hand()));
+                    return;
                 }
 
+                // determine round winners
+                if !board.round_winners.is_empty() {
+                    ui.separator();
+                    ui.label("Round winners:");
+                    for winner in &board.round_winners {
+                        ui.label(format!("{} won {} $ with hand {}", winner.get_name(), winner.get_money(), winner.get_hand()));
+                    }
+                }
+                else {
+                    if board.your_turn {
+                        ui.separator();
+                        ui.label("Your turn: Choose action");
+    
+                        let mut input_raise = std::mem::take(&mut self.input_raise);
+                        let mut status = std::mem::take(&mut self.status);
+    
+                        ui.horizontal(|ui| {
+                            if ui.button("Fold").clicked() {
+                                self.send_action(PlayerAction::Fold);
+                            }
+                            if ui.button("Check/Call").clicked() {
+                                let action = if board.your_bet < board.current_bet {
+                                    PlayerAction::Call
+                                } else {
+                                    PlayerAction::Check
+                                };
+                                self.send_action(action);
+                            }
+                            ui.label("Raise:");
+                            ui.text_edit_singleline(&mut input_raise);
+                            if ui.button("Raise").clicked() {
+                                if let Ok(amount) = input_raise.trim().parse::<u16>() {
+                                    if amount >= board.min_raise {
+                                        self.send_action(PlayerAction::Raise(amount));
+                                        input_raise.clear();
+                                    } else {
+                                        status = format!("Raise must be at least {}", board.min_raise);
+                                    }
+                                } else {
+                                    status = "Invalid raise amount".to_string();
+                                }
+                            }
+                            if ui.button("All-in").clicked() {
+                                self.send_action(PlayerAction::AllIn);
+                            }
+                        });
+                        self.input_raise = input_raise;
+                        self.status = status;
+                    } else {
+                        ui.separator();
+                        ui.label(format!("Waiting for other players action..."));
+                    }
+                }
             }
             if !self.status.is_empty() {
                 ui.colored_label(egui::Color32::RED, &self.status);

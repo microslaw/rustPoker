@@ -1,6 +1,8 @@
 use crate::card_tools::card::Card;
 use crate::card_tools::hand::Hand;
+use serde::{Serialize, Deserialize};
 
+#[derive(Clone, Serialize, Deserialize)]
 pub struct Player {
     pub hand: Hand,
     money: u16,
@@ -46,6 +48,11 @@ impl Player {
     
     pub fn add_money(&mut self, amount: u16) {
         self.money += amount;
+    }
+
+    pub fn reset_bet(&mut self) {
+        self.current_bet = 0;
+        self.all_in = false;
     }
     
     pub fn bet(&mut self, amount: u16) -> bool {
